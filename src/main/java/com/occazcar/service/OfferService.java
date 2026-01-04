@@ -18,13 +18,16 @@ public class OfferService {
     private final OfferRepository offerRepository;
     private final VehicleRepository vehicleRepository;
     private final AuthService authService;
+    private final NotificationService notificationService;
 
     public OfferService(OfferRepository offerRepository,
                         VehicleRepository vehicleRepository,
-                        AuthService authService) {
+                        AuthService authService,
+                        NotificationService notificationService) {
         this.offerRepository = offerRepository;
         this.vehicleRepository = vehicleRepository;
         this.authService = authService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -80,6 +83,14 @@ public class OfferService {
 
         offer.setStatus(Offer.OfferStatus.valueOf(status.toUpperCase()));
         offer = offerRepository.save(offer);
+
+        // Notifier l'acheteur du changement de statut
+        String vehicleInfo = offer.getVehicle().getBrand() + " " + offer.getVehicle().getModel();
+        notificationService.notifyOfferStatusChange(
+                offer.getBuyer().getId(),
+                vehicleInfo,
+                status
+        );
 
         return mapToResponse(offer);
     }

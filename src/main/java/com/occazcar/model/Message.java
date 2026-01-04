@@ -7,11 +7,11 @@ import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "offers")
+@Table(name = "messages")
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class Offer {
+public class Message {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -22,36 +22,24 @@ public class Offer {
     private Vehicle vehicle;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "buyer_id", nullable = false)
-    private User buyer;
+    @JoinColumn(name = "sender_id", nullable = false)
+    private User sender;
+
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "receiver_id", nullable = false)
+    private User receiver;
+
+    @Column(nullable = false, length = 2000)
+    private String content;
 
     @Column(nullable = false)
-    private Double proposedPrice;
-
-    @Column(length = 1000)
-    private String message;
-
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private OfferStatus status = OfferStatus.EN_ATTENTE;
+    private Boolean isRead = false;
 
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
-    private LocalDateTime updatedAt;
-
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
-    }
-
-    @PreUpdate
-    protected void onUpdate() {
-        updatedAt = LocalDateTime.now();
-    }
-
-    public enum OfferStatus {
-        EN_ATTENTE, ACCEPTEE, REFUSEE
     }
 }

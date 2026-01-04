@@ -7,6 +7,7 @@ import jakarta.validation.Valid;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 
 @RestController
@@ -83,6 +84,34 @@ public class VehicleController {
             Long userId = (Long) authentication.getPrincipal();
             vehicleService.deleteVehicle(id, userId);
             return ResponseEntity.ok("Véhicule supprimé");
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // Upload de photos
+    @PostMapping("/{id}/photos")
+    public ResponseEntity<?> uploadPhotos(@PathVariable Long id,
+                                          @RequestParam("files") MultipartFile[] files,
+                                          Authentication authentication) {
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            VehicleResponse response = vehicleService.uploadPhotos(id, files, userId);
+            return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(e.getMessage());
+        }
+    }
+
+    // Suppression d'une photo
+    @DeleteMapping("/{id}/photos")
+    public ResponseEntity<?> deletePhoto(@PathVariable Long id,
+                                         @RequestParam String photoUrl,
+                                         Authentication authentication) {
+        try {
+            Long userId = (Long) authentication.getPrincipal();
+            VehicleResponse response = vehicleService.deletePhoto(id, photoUrl, userId);
+            return ResponseEntity.ok(response);
         } catch (Exception e) {
             return ResponseEntity.badRequest().body(e.getMessage());
         }

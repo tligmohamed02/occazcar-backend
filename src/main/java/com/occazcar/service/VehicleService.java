@@ -16,10 +16,14 @@ public class VehicleService {
 
     private final VehicleRepository vehicleRepository;
     private final AuthService authService;
+    private final NotificationService notificationService;
 
-    public VehicleService(VehicleRepository vehicleRepository, AuthService authService) {
+    public VehicleService(VehicleRepository vehicleRepository,
+                          AuthService authService,
+                          NotificationService notificationService) {
         this.vehicleRepository = vehicleRepository;
         this.authService = authService;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -49,6 +53,9 @@ public class VehicleService {
 
         vehicle = vehicleRepository.save(vehicle);
 
+        // Notifier tous les acheteurs du nouveau véhicule
+        notificationService.notifyNewVehicle(vehicle);
+
         return mapToResponse(vehicle);
     }
 
@@ -56,7 +63,6 @@ public class VehicleService {
     public List<VehicleResponse> searchVehicles(String brand, String model,
                                                 Double minPrice, Double maxPrice,
                                                 Integer minYear, Integer maxYear) {
-        // Créer une spec de base (toujours vraie)
         Specification<Vehicle> spec = (root, query, cb) -> cb.conjunction();
 
         if (brand != null && !brand.isEmpty()) {
@@ -80,7 +86,6 @@ public class VehicleService {
             spec = spec.and((root, query, cb) -> cb.lessThanOrEqualTo(root.get("year"), maxYear));
         }
 
-        // Filtrer seulement les véhicules disponibles
         spec = spec.and((root, query, cb) ->
                 cb.equal(root.get("status"), Vehicle.VehicleStatus.DISPONIBLE));
 
@@ -132,6 +137,62 @@ public class VehicleService {
         }
 
         vehicleRepository.delete(vehicle);
+    }
+
+    @Transactional
+    public VehicleResponse uploadPhotos(Long vehicleId, org.springframework.web.multipart.MultipartFile[] files, Long userId) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new RuntimeException("Véhicule non trouvé"));
+
+        if (!vehicle.getSeller().getId().equals(userId)) {
+            throw new RuntimeException("Non autorisé");
+        }
+
+        try {
+            String uploadDir = "uploads/vehicles/" + vehicleId;
+            java.nio.file.Path uploadPath = java.nio.file.Paths.get(uploadDir);
+
+            if (!java.nio.file.Files.exists(uploadPath)) {
+                java.nio.file.Files.createDirectories(uploadPath);
+            }
+
+            for (org.springframework.web.multipart.MultipartFile file : files) {
+                String fileName = System.currentTimeMillis() + "_" + file.getOriginalFilename();
+                java.nio.file.Path filePath = uploadPath.resolve(fileName);
+                java.nio.file.Files.copy(file.getInputStream(), filePath);
+
+                String photoUrl = "/uploads/vehicles/" + vehicleId + "/" + fileName;
+                vehicle.getPhotos().add(photoUrl);
+            }
+
+            vehicle = vehicleRepository.save(vehicle);
+            return mapToResponse(vehicle);
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de l'upload: " + e.getMessage());
+        }
+    }
+
+    @Transactional
+    public VehicleResponse deletePhoto(Long vehicleId, String photoUrl, Long userId) {
+        Vehicle vehicle = vehicleRepository.findById(vehicleId)
+                .orElseThrow(() -> new RuntimeException("Véhicule non trouvé"));
+
+        if (!vehicle.getSeller().getId().equals(userId)) {
+            throw new RuntimeException("Non autorisé");
+        }
+
+        try {
+            vehicle.getPhotos().remove(photoUrl);
+            vehicle = vehicleRepository.save(vehicle);
+
+            // Supprimer le fichier physique
+            String filePath = "." + photoUrl;
+            java.nio.file.Files.deleteIfExists(java.nio.file.Paths.get(filePath));
+
+            return mapToResponse(vehicle);
+        } catch (Exception e) {
+            throw new RuntimeException("Erreur lors de la suppression: " + e.getMessage());
+        }
     }
 
     private VehicleResponse mapToResponse(Vehicle vehicle) {
