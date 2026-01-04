@@ -7,6 +7,8 @@ import com.occazcar.model.User;
 import com.occazcar.model.Vehicle;
 import com.occazcar.repository.OfferRepository;
 import com.occazcar.repository.VehicleRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import java.util.List;
@@ -14,6 +16,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class OfferService {
+
+    private static final Logger logger = LoggerFactory.getLogger(OfferService.class);
 
     private final OfferRepository offerRepository;
     private final VehicleRepository vehicleRepository;
@@ -32,6 +36,9 @@ public class OfferService {
 
     @Transactional
     public OfferResponse createOffer(OfferRequest request, Long buyerId) {
+        logger.info("Création d'une offre pour le véhicule {} par l'acheteur {}",
+                request.getVehicleId(), buyerId);
+
         User buyer = authService.getUserById(buyerId);
         Vehicle vehicle = vehicleRepository.findById(request.getVehicleId())
                 .orElseThrow(() -> new RuntimeException("Véhicule non trouvé"));
@@ -44,6 +51,7 @@ public class OfferService {
 
         offer = offerRepository.save(offer);
 
+        logger.info("Offre créée avec succès, ID: {}", offer.getId());
         return mapToResponse(offer);
     }
 
@@ -74,6 +82,8 @@ public class OfferService {
 
     @Transactional
     public OfferResponse updateOfferStatus(Long offerId, String status, Long userId) {
+        logger.info("Mise à jour du statut de l'offre {} vers {}", offerId, status);
+
         Offer offer = offerRepository.findById(offerId)
                 .orElseThrow(() -> new RuntimeException("Offre non trouvée"));
 
@@ -89,15 +99,21 @@ public class OfferService {
             Vehicle vehicle = offer.getVehicle();
             vehicle.setStatus(Vehicle.VehicleStatus.VENDU);
             vehicleRepository.save(vehicle);
+            logger.info("Véhicule {} marqué comme VENDU", vehicle.getId());
         }
 
         // Notifier l'acheteur du changement de statut
-        String vehicleInfo = offer.getVehicle().getBrand() + " " + offer.getVehicle().getModel();
-        notificationService.notifyOfferStatusChange(
-                offer.getBuyer().getId(),
-                vehicleInfo,
-                status
-        );
+        try {
+            String vehicleInfo = offer.getVehicle().getBrand() + " " + offer.getVehicle().getModel();
+            notificationService.notifyOfferStatusChange(
+                    offer.getBuyer().getId(),
+                    vehicleInfo,
+                    status
+            );
+            logger.info("Notification envoyée à l'acheteur {}", offer.getBuyer().getId());
+        } catch (Exception e) {
+            logger.error("Erreur lors de l'envoi de la notification: {}", e.getMessage(), e);
+        }
 
         return mapToResponse(offer);
     }

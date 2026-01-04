@@ -5,6 +5,8 @@ import com.occazcar.dto.VehicleResponse;
 import com.occazcar.model.User;
 import com.occazcar.model.Vehicle;
 import com.occazcar.repository.VehicleRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -13,6 +15,8 @@ import java.util.stream.Collectors;
 
 @Service
 public class VehicleService {
+
+    private static final Logger logger = LoggerFactory.getLogger(VehicleService.class);
 
     private final VehicleRepository vehicleRepository;
     private final AuthService authService;
@@ -28,6 +32,8 @@ public class VehicleService {
 
     @Transactional
     public VehicleResponse createVehicle(VehicleRequest request, Long sellerId) {
+        logger.info("Création d'un véhicule par le vendeur: {}", sellerId);
+
         User seller = authService.getUserById(sellerId);
 
         Vehicle vehicle = new Vehicle();
@@ -52,9 +58,15 @@ public class VehicleService {
         }
 
         vehicle = vehicleRepository.save(vehicle);
+        logger.info("Véhicule créé avec succès, ID: {}", vehicle.getId());
 
         // Notifier tous les acheteurs du nouveau véhicule
-        notificationService.notifyNewVehicle(vehicle);
+        try {
+            notificationService.notifyNewVehicle(vehicle);
+            logger.info("Notifications envoyées pour le nouveau véhicule");
+        } catch (Exception e) {
+            logger.error("Erreur lors de l'envoi des notifications: {}", e.getMessage(), e);
+        }
 
         return mapToResponse(vehicle);
     }
@@ -101,8 +113,9 @@ public class VehicleService {
     }
 
     public List<VehicleResponse> getSellerVehicles(Long sellerId) {
-        return vehicleRepository.findBySellerIdAndStatus(sellerId, Vehicle.VehicleStatus.DISPONIBLE)
-                .stream()
+        // Retourner TOUS les véhicules du vendeur, pas seulement DISPONIBLE
+        return vehicleRepository.findAll().stream()
+                .filter(v -> v.getSeller().getId().equals(sellerId))
                 .map(this::mapToResponse)
                 .collect(Collectors.toList());
     }
