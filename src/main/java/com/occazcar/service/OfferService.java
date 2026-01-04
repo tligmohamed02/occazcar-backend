@@ -84,6 +84,13 @@ public class OfferService {
         offer.setStatus(Offer.OfferStatus.valueOf(status.toUpperCase()));
         offer = offerRepository.save(offer);
 
+        // Si l'offre est acceptée, marquer le véhicule comme VENDU
+        if ("ACCEPTEE".equals(status)) {
+            Vehicle vehicle = offer.getVehicle();
+            vehicle.setStatus(Vehicle.VehicleStatus.VENDU);
+            vehicleRepository.save(vehicle);
+        }
+
         // Notifier l'acheteur du changement de statut
         String vehicleInfo = offer.getVehicle().getBrand() + " " + offer.getVehicle().getModel();
         notificationService.notifyOfferStatusChange(
